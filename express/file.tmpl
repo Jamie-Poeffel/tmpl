@@ -405,7 +405,8 @@ EOF>>
 
 # Initialize git if requested
 cd: ../..
-if: $use_git == yes {
+if: $use_git == yes 
+{
     command
     - git init
     - git add .
