@@ -3,6 +3,11 @@ function: d(name)
     mkdir: $name
 }
 
+function: c(name) 
+{
+    create_file: $name
+}
+
 var: folder = input(What is your project named?, my-app)
 
 d($folder)
@@ -16,7 +21,7 @@ end_command
 
 write_file(.gitignore): /node_modules \n\n package-lock.json
 
-create_file: index.ts
+c(index.ts)
 
 // Creating folders
 
@@ -27,8 +32,13 @@ d(models)
 d(services)
 d(types)
 d(routes)
+d(middlewares)
 
 cd: routes
 
-create_file: router.ts
+c(router.ts)
+
+cd: ../middlewares
+
+c(auth.middleware.ts) 
 
