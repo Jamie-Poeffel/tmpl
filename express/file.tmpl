@@ -1,0 +1,32 @@
+function: dir(name) 
+{
+    mkdir: $name
+}
+
+var: folder = input(What is your project named?, my-app)
+
+mkdir: $folder
+
+cd: $folder
+
+command
+- npm init -y
+- npm install express
+end_command
+
+write_file(.gitignore): /node_modules \n\n package-lock.json
+
+if: $folder == test
+    create_file: index.ts
+
+// Creating folders
+
+if: $folder == test
+{
+    dir(repo)
+    dir(config)
+    mkdir: controllers
+    mkdir: models
+    mkdir: services
+    mkdir: types
+}
