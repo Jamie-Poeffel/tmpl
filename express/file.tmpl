@@ -1,11 +1,11 @@
-function: dir(name) 
+function: d(name) 
 {
     mkdir: $name
 }
 
 var: folder = input(What is your project named?, my-app)
 
-mkdir: $folder
+d($folder)
 
 cd: $folder
 
@@ -16,17 +16,13 @@ end_command
 
 write_file(.gitignore): /node_modules \n\n package-lock.json
 
-if: $folder == test
-    create_file: index.ts
+create_file: index.ts
 
 // Creating folders
 
-if: $folder == test
-{
-    dir(repo)
-    dir(config)
-    mkdir: controllers
-    mkdir: models
-    mkdir: services
-    mkdir: types
-}
+d(repo)
+d(config)
+d(controllers)
+d(models)
+d(services)
+d(types)
