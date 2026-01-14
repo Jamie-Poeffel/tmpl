@@ -8,10 +8,6 @@ function: c(name) {
     create_file: $name
 }
 
-function: w(filename, content) {
-    write_file($filename): $content
-}
-
 # Get project details
 var: folder = input(What is your project named?, my-express-api)
 var: port = input(What port should the server run on?, 3000)
@@ -30,17 +26,31 @@ command
 - npx tsc --init
 end_command
 
-# Create .gitignore
-w(.gitignore): node_modules \n dist \n .env \n *.log \n .DS_Store
+# .gitignore
+write_file(.gitignore): <<EOF
+node_modules
+dist
+.env
+*.log
+.DS_Store
+EOF>>
 
-# Create .env file
-w(.env): PORT=$port \n NODE_ENV=development \n API_VERSION=v1
+# .env
+write_file(.env): <<EOF
+PORT=$port
+NODE_ENV=development
+API_VERSION=v1
+EOF>>
 
-# Create .env.example
-w(.env.example): PORT=3000 \n NODE_ENV=development \n API_VERSION=v1
+# .env.example
+write_file(.env.example): <<EOF
+PORT=3000
+NODE_ENV=development
+API_VERSION=v1
+EOF>>
 
-# Update package.json with scripts
-w(package.json): <<EOF
+# package.json
+write_file(package.json): <<EOF
 {
   "name": "$folder",
   "version": "1.0.0",
@@ -70,8 +80,8 @@ w(package.json): <<EOF
 }
 EOF>>
 
-# Update tsconfig.json
-w(tsconfig.json): <<EOF
+# tsconfig.json
+write_file(tsconfig.json): <<EOF
 {
   "compilerOptions": {
     "target": "ES2020",
@@ -91,56 +101,50 @@ w(tsconfig.json): <<EOF
 }
 EOF>>
 
-# Create README
-w(README.md): <<EOF
+# README.md
+write_file(README.md): <<EOF
 # $folder
 
 Express TypeScript API
 
 ## Installation
-
 \`\`\`bash
 npm install
 \`\`\`
 
 ## Development
-
 \`\`\`bash
 npm run dev
 \`\`\`
 
 ## Build
-
 \`\`\`bash
 npm run build
 \`\`\`
 
 ## Start Production
-
 \`\`\`bash
 npm start
 \`\`\`
 
 ## Environment Variables
-
-Copy \`.env.example\` to \`.env\` and update values as needed.
+Copy \`.env.example\` to \`.env\`.
 
 ## Project Structure
-
 \`\`\`
 src/
-├── config/       # Configuration files
-├── controllers/  # Route controllers
-├── middlewares/  # Custom middlewares
-├── models/       # Data models
-├── routes/       # Route definitions
-├── services/     # Business logic
-├── types/        # TypeScript type definitions
-└── index.ts      # Entry point
+├── config/
+├── controllers/
+├── middlewares/
+├── models/
+├── routes/
+├── services/
+├── types/
+└── index.ts
 \`\`\`
 EOF>>
 
-# Create src directory structure
+# src structure
 d(src)
 cd: src
 
@@ -152,9 +156,9 @@ d(types)
 d(routes)
 d(middlewares)
 
-# Create main entry point
-w(index.ts): <<EOF
-import express, { Application } from 'express';
+# src/index.ts
+write_file(index.ts): <<EOF
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import router from './routes/router';
@@ -162,254 +166,119 @@ import { errorHandler } from './middlewares/error.middleware';
 
 dotenv.config();
 
-const app: Application = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Routes
 app.use('/api', router);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get('/health', (_, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Error handling
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(\`🚀 Server is running on http://localhost:\${PORT}\`);
+  console.log(\`🚀 Server running on http://localhost:\${PORT}\`);
 });
-
-export default app;
 EOF>>
 
-# Create config files
+# config
 cd: config
-w(database.config.ts): <<EOF
-export const databaseConfig = {
-  // Add your database configuration here
-};
-EOF>>
 
-w(app.config.ts): <<EOF
+write_file(app.config.ts): <<EOF
 export const appConfig = {
-  apiVersion: process.env.API_VERSION || 'v1',
-  environment: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '3000', 10),
+  port: Number(process.env.PORT) || 3000,
+  env: process.env.NODE_ENV || 'development',
 };
 EOF>>
 
-# Create route files
+write_file(database.config.ts): <<EOF
+export const databaseConfig = {};
+EOF>>
+
+# routes
 cd: ../routes
-w(router.ts): <<EOF
+
+write_file(router.ts): <<EOF
 import { Router } from 'express';
 import { exampleController } from '../controllers/example.controller';
 
 const router = Router();
 
-// Example routes
 router.get('/example', exampleController.getAll);
-router.get('/example/:id', exampleController.getById);
-router.post('/example', exampleController.create);
-router.put('/example/:id', exampleController.update);
-router.delete('/example/:id', exampleController.delete);
 
 export default router;
 EOF>>
 
-# Create controller files
+# controllers
 cd: ../controllers
-w(example.controller.ts): <<EOF
-import { Request, Response, NextFunction } from 'express';
+
+write_file(example.controller.ts): <<EOF
+import { Request, Response } from 'express';
 
 export const exampleController = {
-  getAll: async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      // TODO: Implement logic
-      res.status(200).json({ message: 'Get all examples' });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  getById: async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.params;
-      // TODO: Implement logic
-      res.status(200).json({ message: \`Get example with id: \${id}\` });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  create: async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      // TODO: Implement logic
-      res.status(201).json({ message: 'Create example', data: req.body });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  update: async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.params;
-      // TODO: Implement logic
-      res.status(200).json({ message: \`Update example with id: \${id}\`, data: req.body });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  delete: async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.params;
-      // TODO: Implement logic
-      res.status(200).json({ message: \`Delete example with id: \${id}\` });
-    } catch (error) {
-      next(error);
-    }
-  },
-};
-EOF>>
-
-# Create middleware files
-cd: ../middlewares
-w(auth.middleware.ts): <<EOF
-import { Request, Response, NextFunction } from 'express';
-
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // TODO: Implement authentication logic
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    // Verify token here
-    next();
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+  getAll: async (_: Request, res: Response) => {
+    res.json({ message: 'Hello from controller' });
   }
 };
 EOF>>
 
-w(error.middleware.ts): <<EOF
+# middlewares
+cd: ../middlewares
+
+write_file(error.middleware.ts): <<EOF
 import { Request, Response, NextFunction } from 'express';
 
 export const errorHandler = (
   err: Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
-  console.error(err.stack);
-
-  res.status(500).json({
-    error: {
-      message: err.message || 'Internal Server Error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-    },
-  });
+  res.status(500).json({ message: err.message });
 };
 EOF>>
 
-w(logger.middleware.ts): <<EOF
-import { Request, Response, NextFunction } from 'express';
-
-export const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const timestamp = new Date().toISOString();
-  console.log(\`[\${timestamp}] \${req.method} \${req.path}\`);
-  next();
-};
-EOF>>
-
-# Create service files
+# services
 cd: ../services
-w(example.service.ts): <<EOF
+
+write_file(example.service.ts): <<EOF
 export class ExampleService {
-  async findAll() {
-    // TODO: Implement business logic
+  findAll() {
     return [];
   }
-
-  async findById(id: string) {
-    // TODO: Implement business logic
-    return null;
-  }
-
-  async create(data: any) {
-    // TODO: Implement business logic
-    return data;
-  }
-
-  async update(id: string, data: any) {
-    // TODO: Implement business logic
-    return data;
-  }
-
-  async delete(id: string) {
-    // TODO: Implement business logic
-    return true;
-  }
 }
-
-export default new ExampleService();
 EOF>>
 
-# Create model files
+# models
 cd: ../models
-w(example.model.ts): <<EOF
+
+write_file(example.model.ts): <<EOF
 export interface Example {
   id: string;
   name: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export class ExampleModel {
-  // TODO: Implement model methods
 }
 EOF>>
 
-# Create type definitions
+# types
 cd: ../types
-w(index.ts): <<EOF
-export interface ApiResponse<T = any> {
+
+write_file(index.ts): <<EOF
+export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
-  message?: string;
-}
-
-export interface PaginationParams {
-  page: number;
-  limit: number;
-}
-
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
 }
 EOF>>
 
-# Initialize git if requested
+# git init
 cd: ../..
-if: $use_git == yes 
-{
-    command
-    - git init
-    - git add .
-    - git commit -m "Initial commit: Express TypeScript API setup"
-    end_command
+if: $use_git == yes {
+  command
+  - git init
+  - git add .
+  - git commit -m "Initial commit: Express TypeScript API"
+  end_command
 }
