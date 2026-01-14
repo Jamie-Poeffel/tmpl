@@ -99,49 +99,58 @@ pub fn parse_template(template: &str) -> Result<(), Box<dyn std::error::Error>> 
 }
 
 fn parse_line_and_execute(
-    line: &str, 
-    is_command: bool, 
+    line: &str,
+    is_command: bool,
     variables: &mut HashMap<String, String>,
     functions: &HashMap<String, FunctionDefinition>,
     all_lines: &[&str],
-    current_index: usize
+    current_index: usize,
 ) -> (bool, usize) {
     let line = line.trim();
 
     if line.starts_with("var:") {
         handle_var(line, variables);
+
     } else if line.starts_with("mkdir:") {
         handle_mkdir(line, variables);
+
     } else if line.starts_with("create_file:") {
         handle_create_file(line, variables);
+
+    } else if is_function_call(line, functions) {
+        handle_function_call(line, variables, functions, all_lines);
+
     } else if line.starts_with("write_file(") {
-        handle_write_file(line, variables, all_lines, current_index);
+        let skip = handle_write_file(line, variables, all_lines, current_index);
+        return (is_command, skip);
+
     } else if line.starts_with("command") {
         return (true, 0);
+
     } else if line.starts_with("end_command") {
         return (false, 0);
+
     } else if line.starts_with("-") {
         handle_command_line(line, is_command, variables);
         return (true, 0);
+
     } else if line.starts_with("cd:") {
         handle_cd(line, variables);
+
     } else if line.starts_with("if:") {
         let skip = handle_if(line, is_command, variables, all_lines, current_index);
         return (is_command, skip);
-    } else if line.starts_with("#") {
-        // Comment line, ignore
-    } else if line == "{" || line == "}" {
-        // Block delimiters, ignore
-    } else if line.is_empty() {
-        // Skip empty lines
-    } else if is_function_call(line, functions) {
-        // Check if it's a function call
-        handle_function_call(line, variables, functions, all_lines);
+
+    } else if line.starts_with("#")
+        || line.is_empty()
+        || line == "{"
+        || line == "}"
+    {
     } else {
         println!("Unknown command: {}", line);
     }
-    
-    (false, 0)
+
+    (is_command, 0)
 }
 
 fn replace_variables(text: &str, variables: &HashMap<String, String>) -> String {
@@ -358,14 +367,20 @@ fn handle_function(
 }
 
 fn handle_if(
-    line: &str, 
-    is_command: bool, 
+    line: &str,
+    _is_command: bool,
     variables: &HashMap<String, String>,
     all_lines: &[&str],
-    current_index: usize
+    current_index: usize,
 ) -> usize {
-    let condition = &line[3..].trim();
-    let condition = replace_variables(condition, variables);
+    let mut condition_part = line.trim_start_matches("if:").trim();
+
+    let has_inline_brace = condition_part.ends_with('{');
+    if has_inline_brace {
+        condition_part = condition_part[..condition_part.len() - 1].trim();
+    }
+
+    let condition = replace_variables(condition_part, variables);
 
     let parts: Vec<&str> = condition.splitn(2, "==").collect();
     if parts.len() != 2 {
@@ -375,40 +390,42 @@ fn handle_if(
 
     let left = parts[0].trim();
     let right = parts[1].trim();
-
     let condition_true = left == right;
 
-    if !condition_true {
-        if current_index + 1 < all_lines.len() {
-            let next_line = all_lines[current_index + 1].trim();
-            
-            if next_line == "{" {
-                let mut depth = 1;
-                let mut skip_count = 1; 
-                
-                for i in (current_index + 2)..all_lines.len() {
-                    let block_line = all_lines[i].trim();
-                    
-                    if block_line == "{" {
-                        depth += 1;
-                    } else if block_line == "}" {
-                        depth -= 1;
-                        if depth == 0 {
-                            skip_count = i - current_index;
-                            break;
-                        }
-                    }
-                }
-                
-                return skip_count;
-            } else {
-                return 1;
+    if condition_true {
+        return 0;
+    }
+
+    let mut index = current_index + 1;
+
+    if !has_inline_brace {
+        if index < all_lines.len() && all_lines[index].trim() == "{" {
+            index += 1;
+        } else {
+            return 1;
+        }
+    }
+
+    let mut depth = 1;
+    while index < all_lines.len() {
+        let line = all_lines[index].trim();
+
+        if line.ends_with('{') {
+            depth += 1;
+        } else if line == "}" {
+            depth -= 1;
+            if depth == 0 {
+                let skipped = index - current_index;
+                return skipped;
             }
         }
+
+        index += 1;
     }
 
     0
 }
+
 
 fn handle_var(line: &str, variables: &mut HashMap<String, String>) {
     let name_and_value = &line[4..];
@@ -483,12 +500,12 @@ fn handle_write_file(
     line: &str,
     variables: &HashMap<String, String>,
     all_lines: &[&str],
-    current_index: usize
-) {
+    current_index: usize,
+) -> usize {
     let parts: Vec<&str> = line.splitn(2, "):").collect();
     if parts.len() != 2 {
         eprintln!("Invalid write_file syntax: {}", line);
-        return;
+        return 0;
     }
 
     let file_name_raw = parts[0]
@@ -496,33 +513,53 @@ fn handle_write_file(
         .trim();
 
     let file_name = replace_variables(file_name_raw, variables);
-    let content = replace_variables(parts[1].trim(), variables);
+    let rhs = replace_variables(parts[1].trim(), variables);
 
-    fn unescape(s: &str) -> String {
-        s.replace("\\n", "\n")
-         .replace("\\t", "\t")
-         .replace("\\r", "\r")
-    }
+    let mut content = String::new();
+    let mut consumed_lines = 0;
 
-    let content = unescape(&content);
-
-    let content = if content.starts_with("<<EOF") {
-        let mut collected = String::new();
+    // ─────────────────────────────────────
+    // HEREDOC MODE
+    // ─────────────────────────────────────
+    if rhs == "<<EOF" {
         let mut i = current_index + 1;
+        let mut found_eof = false;
+
         while i < all_lines.len() {
             let line = all_lines[i];
+
             if line.trim() == "EOF>>" {
+                consumed_lines = i - current_index;
+                found_eof = true;
                 break;
             }
-            collected.push_str(line);
-            collected.push('\n');
+
+            content.push_str(line);
+            content.push('\n');
             i += 1;
         }
-        collected
-    } else {
-        content
-    };
 
+        if !found_eof {
+            eprintln!(
+                "write_file heredoc started but EOF>> not found (starting at line {})",
+                current_index + 1
+            );
+            // Skip everything we consumed to avoid re-processing garbage
+            consumed_lines = i - current_index;
+        }
+    } else {
+        // ─────────────────────────────────
+        // SINGLE-LINE MODE
+        // ─────────────────────────────────
+        content = rhs
+            .replace("\\n", "\n")
+            .replace("\\t", "\t")
+            .replace("\\r", "\r");
+    }
+
+    // ─────────────────────────────────────
+    // WRITE FILE
+    // ─────────────────────────────────────
     let running = Arc::new(AtomicBool::new(true));
     let loader_flag = running.clone();
 
@@ -542,7 +579,10 @@ fn handle_write_file(
 
     running.store(false, Ordering::Relaxed);
     loader.join().unwrap();
+
+    consumed_lines
 }
+
 
 fn handle_command_line(line: &str, is_command: bool, variables: &HashMap<String, String>) {
     if !is_command {
