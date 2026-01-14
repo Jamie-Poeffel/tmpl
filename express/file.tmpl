@@ -29,8 +29,9 @@ end_command
 
 # .gitignore
 write_file(.gitignore): <<EOF
-node_modules
-dist
+/node_modules
+/dist
+.env.*
 .env
 *.log
 .DS_Store
