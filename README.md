@@ -59,10 +59,12 @@ function: [name]([arg1], [arg2]) {
 function: create_component(name, type) {
     mkdir: components
     cd: components
-    create_file: name.type
-    write_file(name.type): export default function name() {
+    create_file: $name.$type
+    write_file($name.$type): <<EOF
+    export default function name() {
         return <div>Hello from name</div>
     }
+    EOF>>
 }
 ```
 
@@ -96,14 +98,16 @@ if: [statement] == [value] {
 ```tmpl
 var: environment = input("Select environment", "development")
 
-if: environment == "production" {
-    write_file(config.json): {
+if: $environment == "production" {
+    write_file(config.json): <<EOF
+    {
         "debug": false,
         "apiUrl": "https://api.example.com"
     }
+    EOF>>
 }
 
-if: environment == "development"
+if: $environment == "development"
     write_file(config.json): {"debug": true, "apiUrl": "http://localhost:3000"}
 ```
 
@@ -120,10 +124,16 @@ if: environment == "development"
 
 Store and reuse values throughout your template.
 
+Variables can be called via $.
+
 **Syntax:**
 
 ```tmpl
 var: [name] = [value]
+```
+
+```tmpl
+$[name]
 ```
 
 **Example:**
@@ -134,9 +144,9 @@ var: author = "John Doe"
 var: version = "1.0.0"
 
 write_file(package.json): {
-    "name": "project_name",
-    "author": "author",
-    "version": "version"
+    "name": "$project_name",
+    "author": "$author",
+    "version": "$version"
 }
 ```
 
@@ -190,29 +200,40 @@ create_file: app.js
 
 ### Write to File
 
-Write content to a file. Use `/n` for newlines (note: standard convention is `\n`, but tmpl uses `/n`).
+Write content to a file. Use `<<EOF EOF>>` to write multiline.
 
 **Syntax:**
 
 ```tmpl
-write_file([filename]): [content] /n [more content]
+write_file([filename]): <<EOF
+[content]  
+[more content]
+EOF>>
 ```
 
 **Example:**
 
 ```tmpl
 create_file: README.md
-write_file(README.md): # My Project /n /n Welcome to my project! /n /n ## Installation /n /n Run `npm install` to get started.
+write_file(README.md): <<EOF
+# My Project 
+
+Welcome to my project! 
+
+## Installation
+
+Run `npm install` to get started.
+EOF>>
 ```
 
 **Multi-line example:**
 
-```tmpl
-write_file(index.html): <!DOCTYPE html> /n <html> /n <head> /n <title>My App</title> /n </head> /n <body> /n <h1>Hello World</h1> /n </body> /n </html>
-```
-
 > [!NOTE]
-> The `/n` syntax is used for newlines. Each `/n` creates a line break in the output file.
+> You can also use `\n` as a newline.
+
+```tmpl
+write_file(index.html): <!DOCTYPE html> \\n <html> \\n <head> \\n <title>My App</title> \\n </head> \\n <body> \\n <h1>Hello World</h1> \\n </body> \\n </html>
+```
 
 ---
 
@@ -307,9 +328,9 @@ var: app_name = input("What is your app name?", "my-awesome-app")
 var: port = input("Which port should the server run on?", "3000")
 var: use_typescript = input("Use TypeScript? (yes/no)", "no")
 
-if: use_typescript == "yes" {
+if: $use_typescript == "yes" {
     create_file: tsconfig.json
-    write_file(tsconfig.json): { /n "compilerOptions": { /n "target": "ES2020" /n } /n }
+    write_file(tsconfig.json): { \\n "compilerOptions": { \\n "target": "ES2020" \\n } \\n }
 }
 ```
 
@@ -325,8 +346,8 @@ if: use_typescript == "yes" {
 ```tmpl
 var: project = input("Project name", "my-project")
 
-mkdir: project
-cd: project
+mkdir: $project
+cd: $project
 
 mkdir: src
 mkdir: public
@@ -334,11 +355,11 @@ mkdir: tests
 
 cd: src
 create_file: index.js
-write_file(index.js): console.log('Hello, World!'); /n
+write_file(index.js): console.log('Hello, World!'); \\n
 
 cd: ..
 create_file: README.md
-write_file(README.md): # project /n /n A new project created with tmpl.
+write_file(README.md): # project \\n \\n A new project created with tmpl.
 ```
 
 ---
@@ -349,14 +370,34 @@ write_file(README.md): # project /n /n A new project created with tmpl.
 var: api_name = input("API name", "my-api")
 var: port = input("Port number", "3000")
 
-mkdir: api_name
-cd: api_name
+mkdir: $api_name
+cd: $api_name
 
 create_file: server.js
-write_file(server.js): const express = require('express'); /n const app = express(); /n /n app.get('/', (req, res) => { /n res.json({ message: 'Hello World' }); /n }); /n /n app.listen(port, () => { /n console.log(`Server running on port port`); /n });
+write_file(server.js): <<EOF
+const express = require('express'); 
+const app = express();
+
+app.get('/', (req, res) => { 
+    res.json({ message: 'Hello World' });
+});
+
+app.listen($port, () => { 
+    console.log(`Server running on port $port`);
+});
+EOF>>
 
 create_file: package.json
-write_file(package.json): { /n "name": "api_name", /n "version": "1.0.0", /n "main": "server.js", /n "scripts": { /n "start": "node server.js" /n } /n }
+write_file(package.json): <<EOF
+{ 
+    "name": "api_name",
+    "version": "1.0.0", 
+    "main": "server.js", 
+    "scripts": { 
+        "start": "node server.js"
+    }
+}
+EOF>>
 
 command
 - npm install express
@@ -371,18 +412,30 @@ end_command
 var: env = input("Environment (dev/prod)", "dev")
 var: app_name = input("Application name", "myapp")
 
-if: env == "prod" {
+if: $env == "prod" {
     create_file: config.prod.json
-    write_file(config.prod.json): { /n "environment": "production", /n "debug": false, /n "apiUrl": "https://api.example.com" /n }
+    write_file(config.prod.json): <<EOF
+    {
+        "environment": "production",
+        "debug": false,
+        "apiUrl": "https://api.example.com"
+    }
+    EOF>>
 }
 
-if: env == "dev" {
+if: $env == "dev" {
     create_file: config.dev.json
-    write_file(config.dev.json): { /n "environment": "development", /n "debug": true, /n "apiUrl": "http://localhost:3000" /n }
+    write_file(config.dev.json): <<EOF 
+    {  
+        "environment": "development",
+        "debug": true,
+        "apiUrl": "http://localhost:3000"
+    }
+    EOF>>
 }
 
 create_file: .env
-write_file(.env): APP_NAME=app_name /n ENVIRONMENT=env
+write_file(.env): APP_NAME=$app_name \\n ENVIRONMENT=$env
 ```
 
 ---
@@ -393,13 +446,23 @@ write_file(.env): APP_NAME=app_name /n ENVIRONMENT=env
 function: create_react_component(name) {
     mkdir: components
     cd: components
-    create_file: name.jsx
-    write_file(name.jsx): import React from 'react'; /n /n export default function name() { /n return ( /n <div className="name"> /n <h1>name Component</h1> /n </div> /n ); /n }
+    create_file: $name.jsx
+    write_file($name.jsx): <<EOF
+    import React from 'react';
+    
+    export default function name() {
+        return ( 
+            <div className="name">
+                <h1>name Component</h1> 
+            </div> 
+        );    
+    }
+    EOF>>
     cd: ..
 }
 
 var: component_name = input("Component name", "Button")
-create_react_component(component_name)
+create_react_component($component_name)
 ```
 
 ---

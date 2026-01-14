@@ -115,7 +115,7 @@ fn parse_line_and_execute(
     } else if line.starts_with("create_file:") {
         handle_create_file(line, variables);
     } else if line.starts_with("write_file(") {
-        handle_write_file(line, variables);
+        handle_write_file(line, variables, all_lines, current_index);
     } else if line.starts_with("command") {
         return (true, 0);
     } else if line.starts_with("end_command") {
@@ -128,7 +128,7 @@ fn parse_line_and_execute(
     } else if line.starts_with("if:") {
         let skip = handle_if(line, is_command, variables, all_lines, current_index);
         return (is_command, skip);
-    } else if line.starts_with("//") {
+    } else if line.starts_with("#") {
         // Comment line, ignore
     } else if line == "{" || line == "}" {
         // Block delimiters, ignore
@@ -479,7 +479,12 @@ fn handle_create_file(line: &str, variables: &HashMap<String, String>) {
     loader.join().unwrap();
 }
 
-fn handle_write_file(line: &str, variables: &HashMap<String, String>) {
+fn handle_write_file(
+    line: &str,
+    variables: &HashMap<String, String>,
+    all_lines: &[&str],
+    current_index: usize
+) {
     let parts: Vec<&str> = line.splitn(2, "):").collect();
     if parts.len() != 2 {
         eprintln!("Invalid write_file syntax: {}", line);
@@ -500,6 +505,23 @@ fn handle_write_file(line: &str, variables: &HashMap<String, String>) {
     }
 
     let content = unescape(&content);
+
+    let content = if content.starts_with("<<EOF") {
+        let mut collected = String::new();
+        let mut i = current_index + 1;
+        while i < all_lines.len() {
+            let line = all_lines[i];
+            if line.trim() == "EOF>>" {
+                break;
+            }
+            collected.push_str(line);
+            collected.push('\n');
+            i += 1;
+        }
+        collected
+    } else {
+        content
+    };
 
     let running = Arc::new(AtomicBool::new(true));
     let loader_flag = running.clone();
