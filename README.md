@@ -143,11 +143,13 @@ var: project_name = input("Project name", "my-app")
 var: author = "John Doe"
 var: version = "1.0.0"
 
-write_file(package.json): {
+write_file(package.json): <<EOF
+{
     "name": "$project_name",
     "author": "$author",
     "version": "$version"
 }
+EOF>>
 ```
 
 > [!TIP]
