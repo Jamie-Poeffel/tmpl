@@ -1,0 +1,11 @@
+[package]
+name = "tmpl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+indicatif = "0.17"
+inquire = "0.7"
+dirs = "5.0"
+clap = { version = "4.3", features = ["derive"] }
+reqwest = { version = "0.11", features = ["blocking"] }
