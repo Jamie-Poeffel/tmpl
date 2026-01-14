@@ -276,7 +276,7 @@ EOF>>
 
 # git init
 cd: ../..
-if: $use_git {
+if: $use_git == true {
   command
   - git init
   - git add .
