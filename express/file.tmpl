@@ -12,7 +12,8 @@ function: c(name) {
 var: folder = input(What is your project named?, my-express-api)
 var: port = input(What port should the server run on?, 3000)
 var: author = input(Author name?, Your Name)
-var: use_git = input(Initialize git repository? (yes/no), yes)
+var: use_git = input(Initialize git repository? (yes/no), true)
+
 
 # Create root directory
 d($folder)
@@ -275,10 +276,11 @@ EOF>>
 
 # git init
 cd: ../..
-if: $use_git == yes {
+if: $use_git {
   command
   - git init
   - git add .
   - git commit -m "Initial commit: Express TypeScript API"
   end_command
 }
+
